@@ -2,12 +2,12 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 
-// HTTPS (cert autofirmado) para que el micrófono funcione desde el celular:
-// los navegadores solo permiten micrófono en contexto seguro (https o localhost).
-// El proxy manda /api al backend por debajo, así la página HTTPS no cae en
-// "contenido mixto" al llamar a la API (todo sale por el mismo origen).
-export default defineConfig({
-  plugins: [react(), basicSsl()],
+// HTTPS (cert autofirmado) para que el micrófono funcione desde el celular en
+// desarrollo: los navegadores solo permiten micrófono en contexto seguro.
+// En el build de producción (vite build) NO se incluye basicSsl.
+// El proxy /api es solo de desarrollo; en Vercel lo reemplaza el rewrite de vercel.json.
+export default defineConfig(({ command }) => ({
+  plugins: [react(), ...(command === "serve" ? [basicSsl()] : [])],
   server: {
     proxy: {
       "/api": {
@@ -17,4 +17,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

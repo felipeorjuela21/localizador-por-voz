@@ -1,0 +1,9 @@
+{
+  "$comment": "Reemplaza el host de 'destination' por la URL publica de tu backend en Render, sin barra final. Ej: https://localizador-api.onrender.com/:path*",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://TU-BACKEND.onrender.com/:path*"
+    }
+  ]
+}
