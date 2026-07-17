@@ -25,7 +25,10 @@ origen) y Vercel lo reenvía al backend. Así no hay problemas de CORS ni de "co
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
    - **Instance Type:** Free
-   - *(Opcional)* Variable de entorno `PYTHON_VERSION` = `3.11.9`
+   - **Variable de entorno `PYTHON_VERSION` = `3.11.9`** (¡importante!). El repo ya
+     incluye `backend/.python-version`, pero conviene fijarla también aquí. Con
+     Python muy nuevo (3.13) falla la instalación de `rapidfuzz` (no hay binario
+     y no puede compilarlo).
 4. **Create Web Service** y espera a que el deploy termine.
 5. Copia la URL pública que te da, por ejemplo: `https://localizador-api.onrender.com`
 6. **Sembrar datos** (crea el usuario `admin` y el inventario de ejemplo): en el
