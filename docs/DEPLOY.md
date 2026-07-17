@@ -31,11 +31,9 @@ origen) y Vercel lo reenvía al backend. Así no hay problemas de CORS ni de "co
      y no puede compilarlo).
 4. **Create Web Service** y espera a que el deploy termine.
 5. Copia la URL pública que te da, por ejemplo: `https://localizador-api.onrender.com`
-6. **Sembrar datos** (crea el usuario `admin` y el inventario de ejemplo): en el
-   servicio, pestaña **Shell**, ejecuta:
-   ```bash
-   python -m app.seed
-   ```
+
+El backend **siembra solo** al arrancar (inventario de ejemplo + usuario `admin`)
+si la base está vacía, así que no hay que sembrar a mano.
 
 Verifica en el navegador que `https://TU-BACKEND.onrender.com/health` devuelva `{"status":"ok"}`.
 
@@ -91,9 +89,11 @@ Abre la URL de Vercel:
 ## Persistencia de datos (importante)
 
 El plan Free de Render tiene **disco efímero**: el archivo `localizador.db` se
-reinicia cuando el servicio se reinicia o se vuelve a desplegar, y el servicio se
-"duerme" tras un rato de inactividad. Para un demo sirve; para uso real, migra a
-una base gestionada (persistente):
+reinicia cuando el servicio se reinicia, se redespliega o se "duerme" por
+inactividad. El auto-seed vuelve a crear el inventario y el `admin` en cada
+arranque, pero **los registros de búsqueda que se generen en runtime SÍ se
+pierden** cuando el servicio se duerme. Para un demo sirve; para conservar los
+registros, migra a una base gestionada (persistente):
 
 1. Crea un **PostgreSQL** (Render, Neon o Supabase) y copia su cadena de conexión.
 2. En `backend/requirements.txt` agrega `psycopg[binary]`.

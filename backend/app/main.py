@@ -16,12 +16,16 @@ from .models import (
     RegistroBusqueda,
     Usuario,
 )
+from .seed import seed as sembrar
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Se ejecuta al arrancar: crea las tablas si no existen.
+    # Al arrancar: crea las tablas y siembra datos si la DB está vacía
+    # (idempotente). Necesario en la nube, donde el disco puede reiniciarse
+    # y perder el inventario y el usuario admin.
     crear_db()
+    sembrar()
     yield
 
 
