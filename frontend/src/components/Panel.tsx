@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { getRegistros, type Registro } from "../lib/api";
 
-// Formatea una fecha ISO UTC a hora local legible.
 function fechaLocal(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString([], { dateStyle: "short", timeStyle: "short" });
+  return new Date(iso).toLocaleString([], { dateStyle: "short", timeStyle: "short" });
 }
+
+type Filtro = "todos" | "medicamento" | "ubicacion";
+
+const FILTROS: { id: Filtro; label: string }[] = [
+  { id: "todos", label: "Todos" },
+  { id: "medicamento", label: "💊 Medicamentos" },
+  { id: "ubicacion", label: "📍 Ubicaciones" },
+];
 
 export function Panel() {
   const [registros, setRegistros] = useState<Registro[]>([]);
+  const [filtro, setFiltro] = useState<Filtro>("todos");
   const [estado, setEstado] = useState("Cargando…");
 
   async function cargar() {
@@ -26,79 +33,88 @@ export function Panel() {
     cargar();
   }, []);
 
-  // Resumen: cuántas búsquedas por franja de hora (en hora local).
+  const filtrados = useMemo(
+    () => (filtro === "todos" ? registros : registros.filter((r) => r.tipo === filtro)),
+    [registros, filtro]
+  );
+
   const resumen = useMemo(() => {
     const mapa = new Map<string, number>();
-    for (const r of registros) {
+    for (const r of filtrados) {
       const d = new Date(r.creado);
       const clave = `${d.toLocaleDateString([], { day: "2-digit", month: "2-digit" })} · ${String(
         d.getHours()
       ).padStart(2, "0")}:00`;
       mapa.set(clave, (mapa.get(clave) ?? 0) + 1);
     }
-    return Array.from(mapa.entries()); // registros vienen de más nuevo a más viejo
-  }, [registros]);
+    return Array.from(mapa.entries());
+  }, [filtrados]);
 
   const maxConteo = Math.max(1, ...resumen.map(([, n]) => n));
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Registros de búsqueda</h2>
-        <button
-          onClick={cargar}
-          style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #ccc", cursor: "pointer", background: "#fff", fontSize: 13 }}
-        >
-          ↻ Actualizar
-        </button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 8 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 650, margin: 0 }}>Registros de búsqueda</h2>
+        <button className="btn" onClick={cargar}>↻ Actualizar</button>
       </div>
 
-      {estado && <p style={{ color: "#666", fontSize: 14 }}>{estado}</p>}
+      <div className="nav" style={{ marginBottom: 14 }}>
+        {FILTROS.map((f) => (
+          <button
+            key={f.id}
+            className={`nav-pill${filtro === f.id ? " active" : ""}`}
+            onClick={() => setFiltro(f.id)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
-      {registros.length > 0 && (
+      {estado && <p className="estado">{estado}</p>}
+
+      {filtrados.length > 0 ? (
         <>
-          {/* Resumen por hora */}
-          <div style={{ marginBottom: 20 }}>
-            <p style={{ fontSize: 13, color: "#666", margin: "0 0 8px" }}>
-              Búsquedas por hora ({registros.length} en total)
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div className="card">
+            <p className="section-title">Búsquedas por hora ({filtrados.length} en total)</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               {resumen.map(([franja, n]) => (
-                <div key={franja} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                  <span style={{ width: 90, color: "#333", flexShrink: 0 }}>{franja}</span>
-                  <div style={{ flex: 1, background: "#eee", borderRadius: 4, overflow: "hidden", height: 16 }}>
-                    <div style={{ width: `${(n / maxConteo) * 100}%`, height: "100%", background: "#0c447c" }} />
+                <div key={franja} className="bar-row">
+                  <span className="k">{franja}</span>
+                  <div className="bar-track">
+                    <div className="bar-fill" style={{ width: `${(n / maxConteo) * 100}%` }} />
                   </div>
-                  <span style={{ width: 28, textAlign: "right", color: "#333" }}>{n}</span>
+                  <span className="n">{n}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Tabla de registros */}
-          <div style={{ overflowX: "auto", border: "1px solid #e2e2dc", borderRadius: 8 }}>
-            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+          <div className="tablewrap">
+            <table className="reg">
               <thead>
-                <tr style={{ background: "#faf9f5", textAlign: "left", color: "#555" }}>
-                  <th style={celdaTh}>Hora</th>
-                  <th style={celdaTh}>Usuario</th>
-                  <th style={celdaTh}>Buscó</th>
-                  <th style={celdaTh}>Resultado</th>
+                <tr>
+                  <th>Hora</th>
+                  <th>Tipo</th>
+                  <th>Usuario</th>
+                  <th>Buscó</th>
+                  <th>Resultado</th>
                 </tr>
               </thead>
               <tbody>
-                {registros.map((r) => (
-                  <tr key={r.id} style={{ borderTop: "1px solid #eee" }}>
-                    <td style={{ ...celdaTd, whiteSpace: "nowrap" }}>{fechaLocal(r.creado)}</td>
-                    <td style={celdaTd}>{r.usuario}</td>
-                    <td style={celdaTd}>{r.query}</td>
-                    <td style={celdaTd}>
+                {filtrados.map((r) => (
+                  <tr key={r.id}>
+                    <td style={{ whiteSpace: "nowrap" }}>{fechaLocal(r.creado)}</td>
+                    <td title={r.tipo}>{r.tipo === "ubicacion" ? "📍" : "💊"}</td>
+                    <td>{r.usuario}</td>
+                    <td>{r.query}</td>
+                    <td>
                       {r.encontrado ? (
-                        <span style={{ color: "#185fa5" }}>
+                        <span style={{ color: "var(--accent-ink)" }}>
                           {r.producto} {r.confianza != null && `(${r.confianza}%)`}
                         </span>
                       ) : (
-                        <span style={{ color: "#a32d2d" }}>no encontrado</span>
+                        <span style={{ color: "var(--danger)" }}>sin resultados</span>
                       )}
                     </td>
                   </tr>
@@ -107,10 +123,9 @@ export function Panel() {
             </table>
           </div>
         </>
+      ) : (
+        !estado && <p className="estado">No hay registros de ese tipo.</p>
       )}
     </div>
   );
 }
-
-const celdaTh: React.CSSProperties = { padding: "8px 10px", fontWeight: 600 };
-const celdaTd: React.CSSProperties = { padding: "8px 10px", color: "#333" };

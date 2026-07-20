@@ -34,13 +34,14 @@ class Usuario(SQLModel, table=True):
 
 
 class RegistroBusqueda(SQLModel, table=True):
-    """Bitácora: cada búsqueda queda con usuario, hora y lo que se buscó."""
+    """Bitácora: cada búsqueda queda con usuario, hora, tipo y lo que se buscó."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     usuario: str = Field(index=True)          # nombre del usuario que buscó
+    tipo: str = Field(default="medicamento", index=True)  # "medicamento" | "ubicacion"
     query: str                                # lo que se dijo/escribió
     encontrado: bool = False
-    producto: Optional[str] = None            # nombre completo del producto hallado
+    producto: Optional[str] = None            # resultado: producto o droguería hallada
     confianza: Optional[float] = None
     creado: str = Field(default_factory=_ahora_utc_iso, index=True)  # UTC ISO 8601
 

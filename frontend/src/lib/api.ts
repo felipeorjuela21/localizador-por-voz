@@ -24,11 +24,23 @@ export interface Usuario {
 export interface Registro {
   id: number;
   usuario: string;
+  tipo: string; // "medicamento" | "ubicacion"
   query: string;
   encontrado: boolean;
   producto: string | null;
   confianza: number | null;
   creado: string; // ISO 8601 UTC
+}
+
+export interface Drogueria {
+  nombre: string;
+  razon_social: string;
+  direccion: string;
+  lat: number;
+  lng: number;
+  distancia_m: number;
+  telefono: string | null;
+  horario: string | null;
 }
 
 // Llamamos al backend por el proxy de Vite (/api → http://localhost:8000).
@@ -94,6 +106,22 @@ export async function getRegistros(limite = 500): Promise<Registro[]> {
     headers: authHeaders(),
   });
   if (res.status === 403) throw new Error("Solo el administrador puede ver el panel.");
+  if (!res.ok) throw new Error(`Error del servidor: ${res.status}`);
+  return res.json();
+}
+
+export async function buscarDroguerias(
+  lat: number,
+  lng: number,
+  q?: string
+): Promise<Drogueria[]> {
+  const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+  if (q) params.set("q", q);
+  const res = await fetch(`${API_URL}/droguerias?${params.toString()}`, {
+    headers: authHeaders(),
+  });
+  if (res.status === 503)
+    throw new Error("El servicio de mapas está ocupado. Intenta de nuevo en un momento.");
   if (!res.ok) throw new Error(`Error del servidor: ${res.status}`);
   return res.json();
 }

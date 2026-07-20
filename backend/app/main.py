@@ -1,11 +1,13 @@
 from contextlib import asynccontextmanager
 from typing import Optional
 
+import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, col, select
 
 from .database import crear_db, get_session
+from .droguerias import buscar_droguerias
 from .luces import encender_luz
 from .matching import buscar
 from .models import (
@@ -134,10 +136,12 @@ def _registrar(
     encontrado: bool,
     producto: Optional[str],
     confianza: Optional[float],
+    tipo: str = "medicamento",
 ) -> None:
     session.add(
         RegistroBusqueda(
             usuario=usuario,
+            tipo=tipo,
             query=query,
             encontrado=encontrado,
             producto=producto,
@@ -160,6 +164,36 @@ def listar_registros(
         .order_by(col(RegistroBusqueda.creado).desc())
         .limit(limite)
     ).all()
+
+
+# --- Droguerías cercanas (por ubicación, vía OpenStreetMap) -----------------
+
+@app.get("/droguerias")
+async def droguerias(
+    lat: float,
+    lng: float,
+    q: Optional[str] = None,
+    usuario: Usuario = Depends(usuario_actual),
+    session: Session = Depends(get_session),
+):
+    try:
+        resultados = await buscar_droguerias(lat, lng, q)
+    except httpx.HTTPError:
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo consultar el mapa de droguerías. Intenta de nuevo.",
+        )
+    top = resultados[0] if resultados else None
+    _registrar(
+        session,
+        usuario.nombre,
+        q or "(cercanas)",
+        bool(resultados),
+        (top["razon_social"] or top["nombre"]) if top else None,
+        None,
+        tipo="ubicacion",
+    )
+    return resultados
 
 
 @app.get("/health")

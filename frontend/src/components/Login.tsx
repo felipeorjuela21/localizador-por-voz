@@ -12,8 +12,7 @@ export function Login({ onLogin }: { onLogin: (u: Usuario) => void }) {
     setCargando(true);
     setError("");
     try {
-      const u = await login(n);
-      onLogin(u);
+      onLogin(await login(n));
     } catch {
       setError("No se pudo iniciar sesión. ¿Está el backend corriendo?");
     } finally {
@@ -22,32 +21,33 @@ export function Login({ onLogin }: { onLogin: (u: Usuario) => void }) {
   }
 
   return (
-    <div style={{ maxWidth: 380, margin: "10vh auto 0", padding: 24, fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ fontSize: 22, fontWeight: 600 }}>Localizador de medicamentos</h1>
-      <p style={{ color: "#666", fontSize: 14, marginTop: 4 }}>Ingresa tu nombre para empezar.</p>
+    <div className="login-wrap">
+      <div className="login-logo">💊</div>
+      <h1 style={{ fontSize: 22, fontWeight: 650, margin: 0 }}>Localizador</h1>
+      <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 4 }}>
+        Ingresa tu nombre para empezar.
+      </p>
 
       <input
+        className="input"
         autoFocus
         value={nombre}
         onChange={(e) => setNombre(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && ingresar()}
         placeholder="Tu nombre (ej: maría, admin)"
-        style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #ccc", fontSize: 15, marginTop: 16, boxSizing: "border-box" }}
+        style={{ width: "100%", marginTop: 16 }}
       />
       <button
+        className="btn btn-primary btn-block"
         onClick={ingresar}
         disabled={cargando || !nombre.trim()}
-        style={{
-          width: "100%", marginTop: 12, padding: "10px 16px", borderRadius: 8, fontSize: 15,
-          border: "1px solid #0c447c", background: "#0c447c", color: "#fff",
-          cursor: cargando || !nombre.trim() ? "default" : "pointer", opacity: cargando || !nombre.trim() ? 0.6 : 1,
-        }}
+        style={{ marginTop: 12 }}
       >
         {cargando ? "Ingresando…" : "Ingresar"}
       </button>
 
-      {error && <p style={{ color: "#a32d2d", fontSize: 13, marginTop: 12 }}>{error}</p>}
-      <p style={{ color: "#999", fontSize: 12, marginTop: 20 }}>
+      {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 12 }}>{error}</p>}
+      <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 20 }}>
         El panel de registros solo lo ve el usuario <strong>admin</strong>.
       </p>
     </div>
