@@ -110,6 +110,23 @@ export async function getRegistros(limite = 500): Promise<Registro[]> {
   return res.json();
 }
 
+export async function transcribirAudio(blob: Blob): Promise<string> {
+  const ext = blob.type.includes("webm") ? "webm" : blob.type.includes("ogg") ? "ogg" : "m4a";
+  const fd = new FormData();
+  fd.append("audio", blob, `grabacion.${ext}`);
+  // Sin Content-Type manual: el navegador pone el boundary de multipart.
+  const res = await fetch(`${API_URL}/transcribir`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: fd,
+  });
+  if (res.status === 503)
+    throw new Error("La transcripción de voz no está configurada en el servidor.");
+  if (!res.ok) throw new Error("No se pudo transcribir el audio.");
+  const d = await res.json();
+  return ((d.texto as string) || "").trim();
+}
+
 export async function buscarDroguerias(
   lat: number,
   lng: number,

@@ -4,7 +4,8 @@ import { buscarProducto, listarProductos, type BusquedaResponse, type Producto }
 import { Grid } from "./Grid";
 
 export function Medicamentos() {
-  const { escuchar, hablar, escuchando, soportado, probarMicrofono } = useSpeech();
+  const { escuchar, hablar, escuchando, grabando, transcribiendo, soportado, probarMicrofono } =
+    useSpeech();
   const [texto, setTexto] = useState("");
   const [estado, setEstado] = useState("Toca el micrófono y di el nombre de un medicamento");
   const [escuchado, setEscuchado] = useState("");
@@ -88,9 +89,9 @@ export function Medicamentos() {
       <div className="card">
         <div className="mic-row">
           <button
-            className={`mic-btn${escuchando ? " on" : ""}`}
+            className={`mic-btn${escuchando || grabando ? " on" : ""}`}
             onClick={onMic}
-            disabled={!soportado || escuchando}
+            disabled={escuchando || transcribiendo}
             aria-label="Hablar"
           >
             🎤
@@ -160,8 +161,9 @@ export function Medicamentos() {
       </div>
 
       {!soportado && (
-        <p className="hint" style={{ color: "var(--danger)" }}>
-          Tu navegador no soporta reconocimiento de voz. Usa Chrome, o escribe en el campo de arriba.
+        <p className="hint">
+          En este dispositivo el micrófono <strong>graba y transcribe</strong>: toca 🎤 para grabar
+          y toca de nuevo para terminar.
         </p>
       )}
     </>

@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { transcribirAudio } from "../lib/api";
 
 // La Web Speech API no está en los tipos estándar de TS; la declaramos.
 type SpeechRecognition = any;
@@ -33,70 +34,113 @@ function mensajeError(codigo: string): string {
   }
 }
 
+type Cb = (texto: string) => void;
+type CbErr = (e: string) => void;
+type CbEstado = (s: string) => void;
+
 export function useSpeech() {
   const [escuchando, setEscuchando] = useState(false);
+  const [grabando, setGrabando] = useState(false);
+  const [transcribiendo, setTranscribiendo] = useState(false);
   const [soportado] = useState(() => getRecognition() !== null);
   const recRef = useRef<SpeechRecognition | null>(null);
+  const mediaRecRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
-  const escuchar = useCallback(
-    (
-      onResultado: (texto: string) => void,
-      onError?: (e: string) => void,
-      onEstado?: (s: string) => void,
-    ) => {
-      // El micrófono solo funciona en contexto seguro: https:// o localhost.
-      // Si abres la app por la IP de red (http://192.168.x.x:5173) el navegador lo bloquea.
-      if (!window.isSecureContext) {
+  // --- Reconocimiento nativo del navegador (Chrome/Android/PC) ---
+  const escuchar = useCallback((onResultado: Cb, onError?: CbErr, onEstado?: CbEstado) => {
+    if (!window.isSecureContext) {
+      onError?.("El micrófono requiere HTTPS o localhost. Abre la app en https://…");
+      return;
+    }
+    const rec = getRecognition();
+    if (!rec) {
+      onError?.("Este navegador no soporta reconocimiento de voz.");
+      return;
+    }
+    recRef.current = rec;
+    setEscuchando(true);
+    let huboResultado = false;
+    let audioIniciado = false;
+
+    rec.onaudiostart = () => {
+      audioIniciado = true;
+      onEstado?.("Micrófono activo, habla ahora…");
+    };
+    rec.onspeechstart = () => onEstado?.("Te escucho…");
+    rec.onresult = (e: any) => {
+      huboResultado = true;
+      onResultado(e.results[0][0].transcript);
+    };
+    rec.onerror = (e: any) => {
+      if (e.error === "aborted" && huboResultado) return;
+      if (e.error === "no-speech") {
         onError?.(
-          "El micrófono requiere HTTPS o localhost. Abre la app en http://localhost:5173, no por la IP de red.",
+          audioIniciado
+            ? "No detecté voz. Habla más fuerte y cerca, apenas toques el botón."
+            : "El micrófono no capturó audio. Revisa el dispositivo de entrada."
         );
-        return;
+      } else {
+        onError?.(mensajeError(e.error));
       }
-      const rec = getRecognition();
-      if (!rec) {
-        onError?.("Este navegador no soporta reconocimiento de voz. Usa Chrome o Edge.");
-        return;
-      }
-      recRef.current = rec;
-      setEscuchando(true);
-      let huboResultado = false;
-      let audioIniciado = false; // ¿el navegador llegó a capturar audio del micrófono?
+      setEscuchando(false);
+    };
+    rec.onend = () => setEscuchando(false);
+    try {
+      rec.start();
+    } catch {
+      onError?.("No se pudo iniciar el micrófono. Espera un segundo e intenta de nuevo.");
+      setEscuchando(false);
+    }
+  }, []);
 
-      rec.onaudiostart = () => {
-        audioIniciado = true;
-        onEstado?.("Micrófono activo, habla ahora…");
-      };
-      rec.onspeechstart = () => onEstado?.("Te escucho…");
-      rec.onresult = (e: any) => {
-        huboResultado = true;
-        const texto = e.results[0][0].transcript;
-        onResultado(texto);
-      };
-      rec.onerror = (e: any) => {
-        // "aborted" suele dispararse al reiniciar/cancelar; solo lo mostramos si no hubo resultado.
-        if (e.error === "aborted" && huboResultado) return;
-        if (e.error === "no-speech") {
-          // Distinguimos: ¿el micro captó audio pero no oyó voz, o ni siquiera capturó audio?
-          onError?.(
-            audioIniciado
-              ? "No detecté voz. Habla más fuerte y cerca, apenas toques el botón (no esperes)."
-              : "El micrófono no capturó audio. Revisa en Windows el dispositivo de entrada y que no esté silenciado.",
-          );
-        } else {
-          onError?.(mensajeError(e.error));
-        }
-        setEscuchando(false);
-      };
-      rec.onend = () => setEscuchando(false);
-      try {
-        rec.start();
-      } catch {
-        onError?.("No se pudo iniciar el micrófono. Espera un segundo e intenta de nuevo.");
-        setEscuchando(false);
-      }
-    },
-    [],
-  );
+  // --- Grabar y transcribir (fallback para iPhone y redes que bloquean STT) ---
+  // Es un toggle: primer toque graba, segundo toque detiene y transcribe.
+  const grabarToggle = useCallback((onResultado: Cb, onError?: CbErr, onEstado?: CbEstado) => {
+    const actual = mediaRecRef.current;
+    if (actual && actual.state === "recording") {
+      actual.stop();
+      return;
+    }
+    if (!window.isSecureContext) {
+      onError?.("El micrófono requiere HTTPS. Abre la app por su dirección https://…");
+      return;
+    }
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        chunksRef.current = [];
+        const r = new MediaRecorder(stream);
+        mediaRecRef.current = r;
+        r.ondataavailable = (e) => {
+          if (e.data.size) chunksRef.current.push(e.data);
+        };
+        r.onstop = async () => {
+          setGrabando(false);
+          stream.getTracks().forEach((t) => t.stop());
+          mediaRecRef.current = null;
+          const blob = new Blob(chunksRef.current, { type: r.mimeType || "audio/mp4" });
+          setTranscribiendo(true);
+          onEstado?.("Transcribiendo…");
+          try {
+            const texto = await transcribirAudio(blob);
+            if (texto) onResultado(texto);
+            else onError?.("No entendí el audio. Intenta de nuevo, hablando claro.");
+          } catch (e) {
+            onError?.(e instanceof Error ? e.message : "No se pudo transcribir el audio.");
+          } finally {
+            setTranscribiendo(false);
+          }
+        };
+        r.start();
+        setGrabando(true);
+        onEstado?.("Grabando… toca de nuevo para terminar.");
+      })
+      .catch(() => {
+        onError?.("No pude acceder al micrófono. Revisa el permiso de micrófono.");
+        setGrabando(false);
+      });
+  }, []);
 
   const hablar = useCallback((texto: string) => {
     try {
@@ -108,9 +152,16 @@ export function useSpeech() {
     }
   }, []);
 
-  // Prueba diagnóstica: abre el micrófono y reporta el nivel de sonido (0-100)
-  // en tiempo real. Sirve para saber si el micro capta audio, sin depender del
-  // servicio de reconocimiento. Devuelve una función para detener la prueba.
+  // Elige automáticamente: reconocimiento nativo si existe, si no graba y transcribe.
+  const escucharAuto = useCallback(
+    (onResultado: Cb, onError?: CbErr, onEstado?: CbEstado) => {
+      if (soportado) escuchar(onResultado, onError, onEstado);
+      else grabarToggle(onResultado, onError, onEstado);
+    },
+    [soportado, escuchar, grabarToggle]
+  );
+
+  // Prueba diagnóstica: nivel de sonido del micrófono en tiempo real (0-100).
   const probarMicrofono = useCallback(
     async (onNivel: (n: number) => void, onError?: (e: string) => void): Promise<() => void> => {
       try {
@@ -132,8 +183,7 @@ export function useSpeech() {
             const x = (datos[i] - 128) / 128;
             suma += x * x;
           }
-          const rms = Math.sqrt(suma / datos.length);
-          onNivel(Math.min(100, Math.round(rms * 300)));
+          onNivel(Math.min(100, Math.round(Math.sqrt(suma / datos.length) * 300)));
           requestAnimationFrame(medir);
         };
         medir();
@@ -147,8 +197,16 @@ export function useSpeech() {
         return () => {};
       }
     },
-    [],
+    []
   );
 
-  return { escuchar, hablar, escuchando, soportado, probarMicrofono };
+  return {
+    escuchar: escucharAuto,
+    hablar,
+    escuchando,
+    grabando,
+    transcribiendo,
+    soportado,
+    probarMicrofono,
+  };
 }

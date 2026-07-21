@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, col, select
 
@@ -10,6 +10,7 @@ from .database import crear_db, get_session
 from .droguerias import buscar_droguerias
 from .luces import encender_luz
 from .matching import buscar
+from .transcribir import transcribir_audio
 from .models import (
     BusquedaRequest,
     BusquedaResponse,
@@ -194,6 +195,30 @@ async def droguerias(
         tipo="ubicacion",
     )
     return resultados
+
+
+# --- Transcripción de voz (Whisper vía Groq) para iPhone / redes bloqueadas --
+
+@app.post("/transcribir")
+async def transcribir(
+    audio: UploadFile = File(...),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    contenido = await audio.read()
+    if not contenido:
+        raise HTTPException(status_code=400, detail="Audio vacío")
+    try:
+        texto = await transcribir_audio(
+            contenido, audio.filename or "audio.m4a", audio.content_type or "audio/m4a"
+        )
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="La transcripción de voz no está configurada (falta GROQ_API_KEY).",
+        )
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="No se pudo transcribir el audio.")
+    return {"texto": texto}
 
 
 @app.get("/health")

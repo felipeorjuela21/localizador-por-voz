@@ -29,6 +29,9 @@ origen) y Vercel lo reenvía al backend. Así no hay problemas de CORS ni de "co
      incluye `backend/.python-version`, pero conviene fijarla también aquí. Con
      Python muy nuevo (3.13) falla la instalación de `rapidfuzz` (no hay binario
      y no puede compilarlo).
+   - **Variable de entorno `GROQ_API_KEY`** (opcional pero necesaria para la voz
+     en iPhone). Obtén una gratis en https://console.groq.com → *API Keys*.
+     Sin ella, el micrófono in-app en iPhone dirá "transcripción no configurada".
 4. **Create Web Service** y espera a que el deploy termine.
 5. Copia la URL pública que te da, por ejemplo: `https://localizador-api.onrender.com`
 

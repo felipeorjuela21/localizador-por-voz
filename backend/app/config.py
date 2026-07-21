@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     grid_cols: int = 6
     # Si la tira LED serpentea (zigzag) en vez de reiniciar en cada fila.
     led_zigzag: bool = True
+    # API key de Groq para transcribir voz (Whisper) en dispositivos sin
+    # reconocimiento nativo (iPhone). Vacío = la transcripción no está disponible.
+    groq_api_key: str = ""
 
     model_config = SettingsConfigDict(env_file=".env")
 

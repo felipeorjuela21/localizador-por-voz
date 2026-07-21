@@ -14,7 +14,7 @@ function mapsUrl(d: Drogueria): string {
 }
 
 export function Droguerias() {
-  const { escuchar, hablar, escuchando, soportado } = useSpeech();
+  const { escuchar, hablar, escuchando, grabando, transcribiendo, soportado } = useSpeech();
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [texto, setTexto] = useState("");
   const [estado, setEstado] = useState(
@@ -106,9 +106,9 @@ export function Droguerias() {
       <div className="card">
         <div className="mic-row">
           <button
-            className={`mic-btn${escuchando ? " on" : ""}`}
+            className={`mic-btn${escuchando || grabando ? " on" : ""}`}
             onClick={onMic}
-            disabled={!soportado || escuchando || cargando}
+            disabled={escuchando || transcribiendo || cargando}
             aria-label="Hablar"
           >
             🎤
@@ -194,8 +194,9 @@ export function Droguerias() {
       )}
 
       {!soportado && (
-        <p className="hint" style={{ color: "var(--danger)" }}>
-          Tu navegador no soporta reconocimiento de voz. Usa Chrome/Android, o escribe arriba.
+        <p className="hint">
+          En este dispositivo el micrófono <strong>graba y transcribe</strong>: toca 🎤 para grabar
+          y toca de nuevo para terminar.
         </p>
       )}
     </>
